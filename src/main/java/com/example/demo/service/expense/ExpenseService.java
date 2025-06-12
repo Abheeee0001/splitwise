@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import com.example.demo.dto.ExpenseDTO;
 import com.example.demo.dto.ExpenseParticipantDTO;
+import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.model.Expense;
 import com.example.demo.model.ExpenseParticipant;
 import com.example.demo.model.Person;
@@ -100,13 +101,13 @@ public class ExpenseService implements IExpenseService {
     @Override
     public Expense updateExpense(Long id, ExpenseDTO dto) {
         Expense expense = expenseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Expense not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Expense not found with ID: " + id));
+
         expense.setAmount(dto.getAmount());
         expense.setDescription(dto.getDescription());
         expense.setSplitType(dto.getSplitType());
         expense.setCategory(dto.getCategory());
 
-        // Clear and replace participants
         expense.getParticipants().clear();
         for (ExpenseParticipantDTO part : dto.getParticipants()) {
             Person person = getOrCreatePerson(part.getName());
@@ -119,11 +120,12 @@ public class ExpenseService implements IExpenseService {
 
         return expenseRepository.save(expense);
     }
+
     
     @Override
     public Set<String> getPeopleInExpense(Long id) {
         Expense expense = expenseRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Expense not found with ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Expense not found with ID: " + id));
 
         Set<String> people = new HashSet<>();
         people.add(expense.getPaidBy().getName());
@@ -136,10 +138,14 @@ public class ExpenseService implements IExpenseService {
     }
 
 
+
     @Override
     public void deleteExpense(Long id) {
-        expenseRepository.deleteById(id);
+        Expense expense = expenseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Expense not found with ID: " + id));
+        expenseRepository.delete(expense);
     }
+
 
     @Override
     public Map<String, Object> calculateSettlements() {
