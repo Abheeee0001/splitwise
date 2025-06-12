@@ -17,7 +17,6 @@ import com.example.demo.model.Expense;
 import com.example.demo.model.ExpenseParticipant;
 import com.example.demo.model.Person;
 import com.example.demo.model.enums.SplitType;
-import com.example.demo.repository.ExpenseParticipantRepository;
 import com.example.demo.repository.ExpenseRepository;
 import com.example.demo.repository.PersonRepository;
 
@@ -26,7 +25,6 @@ public class ExpenseService implements IExpenseService {
 
     @Autowired private ExpenseRepository expenseRepository;
     @Autowired private PersonRepository personRepository;
-    @Autowired private ExpenseParticipantRepository expenseParticipantRepository;
 
     @Override
     public Expense addExpense(ExpenseDTO expenseDTO) {
@@ -41,35 +39,52 @@ public class ExpenseService implements IExpenseService {
                           .orElseGet(() -> personRepository.save(new Person(expenseDTO.getPaidBy())));
         expense.setPaidBy(payer);
 
-        BigDecimal total = BigDecimal.ZERO;
         Set<ExpenseParticipant> participants = new HashSet<>();
 
-        for (ExpenseParticipantDTO dto : expenseDTO.getParticipants()) {
-        	
-            Person person = personRepository.findByName(dto.getName())
-                                .orElseGet(() -> personRepository.save(new Person(dto.getName())));
-
-            ExpenseParticipant participant = new ExpenseParticipant();
-            participant.setExpense(expense);
-            participant.setPerson(person);
-
-            if (expenseDTO.getSplitType() == SplitType.PERCENTAGE) {
-                BigDecimal percentage = dto.getShare();
-                BigDecimal shareAmount = expenseDTO.getAmount()
-                                        .multiply(percentage)
-                                        .divide(BigDecimal.valueOf(100));
-                participant.setShare(shareAmount);
-                total = total.add(percentage); // Keep for validation
-            } else {
-                participant.setShare(dto.getShare());
-            }
-
-            participants.add(participant);
+        if (expenseDTO.getParticipants().isEmpty()) {
+            throw new IllegalArgumentException("Participants cannot be empty");
         }
 
+        int numParticipants = expenseDTO.getParticipants().size();
+        BigDecimal totalAmount = expenseDTO.getAmount();
 
-        if (expenseDTO.getSplitType() == SplitType.PERCENTAGE && total.compareTo(BigDecimal.valueOf(100)) != 0) {
-            throw new IllegalArgumentException("Percentage shares must total 100%");
+        if (expenseDTO.getSplitType() == SplitType.EQUAL) {
+            BigDecimal equalShare = totalAmount.divide(BigDecimal.valueOf(numParticipants), 2, BigDecimal.ROUND_HALF_UP);
+
+            for (ExpenseParticipantDTO dto : expenseDTO.getParticipants()) {
+                Person person = getOrCreatePerson(dto.getName());
+                ExpenseParticipant participant = new ExpenseParticipant();
+                participant.setExpense(expense);
+                participant.setPerson(person);
+                participant.setShare(equalShare);
+                participants.add(participant);
+            }
+
+        } else {
+            BigDecimal totalPercentage = BigDecimal.ZERO;
+
+            for (ExpenseParticipantDTO dto : expenseDTO.getParticipants()) {
+                Person person = getOrCreatePerson(dto.getName());
+                ExpenseParticipant participant = new ExpenseParticipant();
+                participant.setExpense(expense);
+                participant.setPerson(person);
+
+                if (expenseDTO.getSplitType() == SplitType.PERCENTAGE) {
+                    BigDecimal percentage = dto.getShare();
+                    BigDecimal shareAmount = totalAmount.multiply(percentage).divide(BigDecimal.valueOf(100));
+                    participant.setShare(shareAmount);
+                    totalPercentage = totalPercentage.add(percentage);
+                } else {
+                    participant.setShare(dto.getShare());
+                }
+
+                participants.add(participant);
+            }
+
+            if (expenseDTO.getSplitType() == SplitType.PERCENTAGE &&
+                totalPercentage.compareTo(BigDecimal.valueOf(100)) != 0) {
+                throw new IllegalArgumentException("Percentage shares must total 100%");
+            }
         }
 
         expense.setParticipants(participants);
@@ -104,6 +119,22 @@ public class ExpenseService implements IExpenseService {
 
         return expenseRepository.save(expense);
     }
+    
+    @Override
+    public Set<String> getPeopleInExpense(Long id) {
+        Expense expense = expenseRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Expense not found with ID: " + id));
+
+        Set<String> people = new HashSet<>();
+        people.add(expense.getPaidBy().getName());
+
+        for (ExpenseParticipant participant : expense.getParticipants()) {
+            people.add(participant.getPerson().getName());
+        }
+
+        return people;
+    }
+
 
     @Override
     public void deleteExpense(Long id) {

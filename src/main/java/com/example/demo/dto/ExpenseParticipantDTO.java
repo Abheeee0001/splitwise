@@ -30,4 +30,13 @@ public class ExpenseParticipantDTO {
     public void setShare(BigDecimal share) {
         this.share = share;
     }
+
+	public ExpenseParticipantDTO(@NotBlank(message = "Participant name is required") String name,
+			@NotNull(message = "Share is required") @DecimalMin(value = "0.0", inclusive = true, message = "Share must be 0 or more") BigDecimal share) {
+		super();
+		this.name = name;
+		this.share = share;
+	}
+    
+    
 }

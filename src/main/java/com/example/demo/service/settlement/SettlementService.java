@@ -61,45 +61,17 @@ public class SettlementService implements ISettlementService {
             detailedBalances.put(person, info);
         }
 
-        // Simple summary
+        // Simple raw summary (who owes whom)
         List<String> summary = new ArrayList<>();
-        List<Entry<String, BigDecimal>> creditors = new ArrayList<>();
-        List<Entry<String, BigDecimal>> debtors = new ArrayList<>();
-
-        for (Entry<String, BigDecimal> entry : netBalance.entrySet()) {
-            if (entry.getValue().compareTo(BigDecimal.ZERO) > 0) {
-                creditors.add(Map.entry(entry.getKey(), entry.getValue()));
-            } else if (entry.getValue().compareTo(BigDecimal.ZERO) < 0) {
-                debtors.add(Map.entry(entry.getKey(), entry.getValue()));
+        for (Expense expense : expenseRepository.findAll()) {
+            String payer = expense.getPaidBy().getName();
+            for (ExpenseParticipant participant : expense.getParticipants()) {
+                String participantName = participant.getPerson().getName();
+                if (!participantName.equals(payer)) {
+                    BigDecimal amount = participant.getShare().setScale(2, RoundingMode.HALF_UP);
+                    summary.add(participantName + " owes " + payer + " ₹" + amount);
+                }
             }
-        }
-
-        creditors.sort(Entry.comparingByValue());
-        debtors.sort(Entry.comparingByValue());
-
-        int i = 0, j = 0;
-        while (i < debtors.size() && j < creditors.size()) {
-            Entry<String, BigDecimal> debtor = debtors.get(i);
-            Entry<String, BigDecimal> creditor = creditors.get(j);
-
-            BigDecimal debt = debtor.getValue().abs();
-            BigDecimal credit = creditor.getValue();
-            BigDecimal settlement = debt.min(credit).setScale(2, RoundingMode.HALF_UP);
-
-            summary.add(debtor.getKey() + " pays " + creditor.getKey() + " ₹" + settlement);
-
-            debtor = Map.entry(debtor.getKey(), debtor.getValue().add(settlement));
-            creditor = Map.entry(creditor.getKey(), creditor.getValue().subtract(settlement));
-
-            debtors.set(i, debtor);
-            creditors.set(j, creditor);
-
-            if (debtor.getValue().compareTo(BigDecimal.ZERO) == 0) {
-				i++;
-			}
-            if (creditor.getValue().compareTo(BigDecimal.ZERO) == 0) {
-				j++;
-			}
         }
 
         return Map.of(
@@ -107,6 +79,7 @@ public class SettlementService implements ISettlementService {
             "detailedBalances", detailedBalances
         );
     }
+
 
     @Override
     public Map<String, Double> getBalances() {

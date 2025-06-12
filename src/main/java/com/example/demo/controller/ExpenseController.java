@@ -1,11 +1,10 @@
 package com.example.demo.controller;
 
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,24 +29,11 @@ public class ExpenseController {
     private IExpenseService expenseService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<Expense>> addExpense(@Valid @RequestBody ExpenseDTO expenseDTO,
-                                                           BindingResult result) {
-        if (result.hasErrors()) {
-            String errorMessage = result.getFieldErrors().stream()
-                    .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                    .collect(Collectors.joining(", "));
-            return ResponseEntity.badRequest().body(new ApiResponse<>(false, null, errorMessage));
-        }
-
-        try {
-            Expense expense = expenseService.addExpense(expenseDTO);
-            return ResponseEntity.ok(new ApiResponse<>(true, expense, "Expense added successfully"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(new ApiResponse<>(false, null, e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(new ApiResponse<>(false, null, "Internal error occurred"));
-        }
+    public ResponseEntity<ApiResponse<Expense>> addExpense(@Valid @RequestBody ExpenseDTO expenseDTO) {
+        Expense expense = expenseService.addExpense(expenseDTO);
+        return ResponseEntity.ok(new ApiResponse<>(true, expense, "Expense added successfully"));
     }
+
 
 
 
@@ -59,11 +45,12 @@ public class ExpenseController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<Expense>> updateExpense(@PathVariable Long id, @RequestBody ExpenseDTO expenseDTO) {
+    public ResponseEntity<ApiResponse<Expense>> updateExpense(@PathVariable Long id,
+                                                              @Valid @RequestBody ExpenseDTO expenseDTO) {
         Expense updated = expenseService.updateExpense(id, expenseDTO);
-        ApiResponse<Expense> response = new ApiResponse<>(true, updated, "Expense updated successfully");
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new ApiResponse<>(true, updated, "Expense updated successfully"));
     }
+
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteExpense(@PathVariable Long id) {
@@ -71,5 +58,13 @@ public class ExpenseController {
         ApiResponse<Void> response = new ApiResponse<>(true, null, "Expense deleted successfully");
         return ResponseEntity.ok(response);
     }
+    
+    @GetMapping("/{id}/people")
+    public ResponseEntity<ApiResponse<Set<String>>> getPeopleInExpense(@PathVariable Long id) {
+        Set<String> people = expenseService.getPeopleInExpense(id);
+        return ResponseEntity.ok(new ApiResponse<>(true, people, "People involved in expense"));
+    }
+
+
 
 }

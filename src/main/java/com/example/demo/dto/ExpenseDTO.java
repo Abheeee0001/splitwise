@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import com.example.demo.model.enums.SplitType;
+import com.example.demo.validation.UniqueParticipants;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -34,6 +35,7 @@ public class ExpenseDTO {
     private SplitType splitType;
 
     @Size(min = 1, message = "At least one participant is required")
+    @UniqueParticipants
     private List<@Valid ExpenseParticipantDTO> participants;
 
 
